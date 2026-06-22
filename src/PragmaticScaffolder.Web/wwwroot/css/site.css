@@ -1,0 +1,30 @@
+.tsc-alert {
+    padding: .75rem 1rem;
+    border-radius: var(--kendo-border-radius-md, 4px);
+    border: 1px solid transparent;
+    margin-bottom: 1rem;
+}
+
+.tsc-alert-info {
+    background: #e3f2fd;
+    border-color: #90caf9;
+    color: #0d47a1;
+}
+
+.tsc-alert-warning {
+    background: #fff8e1;
+    border-color: #ffd54f;
+    color: #7a5b00;
+}
+
+.tsc-alert-success {
+    background: #e8f5e9;
+    border-color: #81c784;
+    color: #1b5e20;
+}
+
+.tsc-alert-error {
+    background: #fdecea;
+    border-color: #ef9a9a;
+    color: #b71c1c;
+}

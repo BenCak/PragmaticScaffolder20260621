@@ -1,0 +1,68 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+
+<TelerikRootComponent>
+    <TelerikAppBar ThemeColor="@ThemeConstants.AppBar.ThemeColor.Primary">
+        <AppBarSection>
+            <TelerikButton FillMode="@ThemeConstants.Button.FillMode.Flat" Icon="@SvgIcon.Menu"
+                           OnClick="@ToggleDrawer" />
+        </AppBarSection>
+        <AppBarSection>
+            <span class="app-title">Pragmatic Scaffolder</span>
+        </AppBarSection>
+    </TelerikAppBar>
+
+    <TelerikDrawer @ref="@_drawer" Data="@_navItems" MiniMode="false" Mode="@DrawerMode.Push"
+                   @bind-SelectedItem="@_selectedItem" @bind-SelectedItem:after="@OnNavSelected">
+        <DrawerContent>
+            <div class="page-container">
+                @Body
+            </div>
+        </DrawerContent>
+    </TelerikDrawer>
+</TelerikRootComponent>
+
+<style>
+    .app-title {
+        margin-left: .5rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+
+    .page-container {
+        padding: 1.5rem;
+        max-width: 1100px;
+    }
+</style>
+
+@code {
+    private TelerikDrawer<NavItem> _drawer = null!;
+    private NavItem? _selectedItem;
+
+    private readonly List<NavItem> _navItems =
+    [
+        new() { Text = "1. Connect",       Icon = SvgIcon.Link, Url = "/" },
+        new() { Text = "2. Select Tables", Icon = SvgIcon.Grid, Url = "/tables" },
+        new() { Text = "3. Generate",      Icon = SvgIcon.Gear, Url = "/generate" },
+    ];
+
+    protected override void OnInitialized()
+    {
+        var path = new Uri(Nav.Uri).AbsolutePath;
+        _selectedItem = _navItems.FirstOrDefault(n => n.Url == path) ?? _navItems[0];
+    }
+
+    private async Task ToggleDrawer() => await _drawer.ToggleAsync();
+
+    private void OnNavSelected()
+    {
+        if (_selectedItem is not null) Nav.NavigateTo(_selectedItem.Url);
+    }
+
+    private sealed class NavItem
+    {
+        public string Text { get; set; } = "";
+        public ISvgIcon? Icon { get; set; }
+        public string Url { get; set; } = "";
+    }
+}

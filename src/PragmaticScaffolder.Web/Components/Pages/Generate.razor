@@ -1,0 +1,396 @@
+@page "/generate"
+@using PragmaticScaffolder.Application
+@using PragmaticScaffolder.Application.Services
+@inject GenerationEngine Engine
+@inject ScaffolderState State
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<PageTitle>Generate — Pragmatic Scaffolder</PageTitle>
+
+<h3>Step 3 — Generate</h3>
+<p class="subtitle">
+    Review what will be generated, then click Generate to write the files to disk.
+</p>
+
+@if (State.SelectedTables.Count == 0)
+{
+    <div class="tsc-alert tsc-alert-warning">
+        No tables selected. <a href="/tables">Go back to Select Tables</a>.
+    </div>
+}
+else
+{
+    <TelerikCard Width="100%">
+        <CardBody>
+            <table class="summary-table">
+                <tbody>
+                    <tr><td>Namespace</td><td><strong>@State.RootNamespace</strong></td></tr>
+                    <tr><td>Output</td><td><strong>@State.OutputPath</strong></td></tr>
+                    <tr><td>Tables</td><td><strong>@State.SelectedTables.Count</strong></td></tr>
+                </tbody>
+            </table>
+            <h6>Generate test projects</h6>
+            <div class="check-row">
+                <TelerikCheckBox Id="apiTests" @bind-Value="@State.GenerateApiTests" />
+                <label for="apiTests">API Tests (xUnit service tests)</label>
+            </div>
+            <div class="check-row">
+                <TelerikCheckBox Id="blazorTests" @bind-Value="@State.GenerateBlazorTests" />
+                <label for="blazorTests">Blazor Tests (bUnit component tests)</label>
+            </div>
+        </CardBody>
+    </TelerikCard>
+
+    @* ── Tree + Preview ──────────────────────────────────────────────────── *@
+    @if (_preview is not null)
+    {
+        @if (_preview.Success && _preview.Files.Count > 0)
+        {
+            <p class="files-count">@_preview.Files.Count files to be generated — select a file to preview its content</p>
+
+            <div class="tree-preview-panel">
+                <div class="tree-pane">
+                    <TelerikTreeView Data="@_flatNodes"
+                                     @bind-ExpandedItems="@_expandedItems"
+                                     SelectionMode="@TreeViewSelectionMode.Single"
+                                     SelectedItems="@_selectedItems"
+                                     SelectedItemsChanged="@OnTreeSelectionChanged">
+                        <TreeViewBindings>
+                            <TreeViewBinding ParentIdField="ParentId" />
+                        </TreeViewBindings>
+                    </TelerikTreeView>
+                </div>
+
+                <div class="content-pane">
+                    @if (_selectedNode is not null)
+                    {
+                        <div class="content-path">@_selectedNode.RelativePath</div>
+                        <pre class="content-body">@_selectedNode.Content</pre>
+                    }
+                    else
+                    {
+                        <div class="content-empty">Select a file from the tree to preview its content</div>
+                    }
+                </div>
+            </div>
+        }
+        else if (!_preview.Success)
+        {
+            <div class="tsc-alert tsc-alert-error">
+                <strong>Preview failed:</strong>
+                <ul>@foreach (var e in _preview.Errors) { <li>@e</li> }</ul>
+            </div>
+        }
+    }
+
+    @* Generate result *@
+    @if (_result is not null)
+    {
+        <div class="tsc-alert @(_result.Success ? "tsc-alert-success" : "tsc-alert-error")">
+            @if (_result.Success)
+            {
+                <span>Done! @_result.Files.Count files written to <strong>@State.OutputPath</strong></span>
+            }
+            else
+            {
+                <strong>Generation failed:</strong>
+                <ul>@foreach (var e in _result.Errors) { <li>@e</li> }</ul>
+            }
+        </div>
+    }
+
+    <div class="toolbar-row">
+        <TelerikButton OnClick="@(() => Nav.NavigateTo("/tables"))">Back</TelerikButton>
+        <TelerikButton FillMode="@ThemeConstants.Button.FillMode.Outline" OnClick="@PreviewAsync" Enabled="@(!_busy)">
+            Preview Files
+        </TelerikButton>
+        <TelerikButton ThemeColor="@ThemeConstants.Button.ThemeColor.Primary" OnClick="@GenerateAsync" Enabled="@(!_busy)">
+            @(_busy ? "Generating…" : "Generate")
+        </TelerikButton>
+        @if (_busy)
+        {
+            <TelerikLoader Size="@ThemeConstants.Loader.Size.Small" />
+        }
+    </div>
+}
+
+<TelerikNotification @ref="@_notification" />
+
+<style>
+    .summary-table {
+        margin-bottom: 1rem;
+        max-width: 500px;
+    }
+
+    .summary-table td {
+        padding: .2rem .75rem .2rem 0;
+    }
+
+    .check-row {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .15rem 0;
+    }
+
+    .files-count {
+        margin: 1rem 0 .5rem;
+        font-weight: 600;
+    }
+
+    .tree-preview-panel {
+        display: flex;
+        height: 580px;
+        border: 1px solid var(--kendo-color-border, #ddd);
+        border-radius: var(--kendo-border-radius-md, 4px);
+        overflow: hidden;
+        margin-bottom: 1rem;
+    }
+
+    .tree-pane {
+        width: 320px;
+        min-width: 320px;
+        border-right: 1px solid var(--kendo-color-border, #ddd);
+        overflow-y: auto;
+        padding: 8px 0;
+    }
+
+    .content-pane {
+        flex: 1;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .content-path {
+        padding: 8px 16px;
+        border-bottom: 1px solid var(--kendo-color-border, #ddd);
+        font-size: .78rem;
+        font-family: monospace;
+        color: var(--kendo-color-subtle, #666);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .content-body {
+        margin: 0;
+        padding: 12px 16px;
+        font-size: .8rem;
+        overflow: auto;
+        flex: 1;
+        font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+        line-height: 1.5;
+        white-space: pre;
+    }
+
+    .content-empty {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--kendo-color-subtle, #666);
+    }
+
+    .toolbar-row {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        margin-top: 1rem;
+    }
+</style>
+
+@code {
+    // ── Tree model ──────────────────────────────────────────────────────────
+
+    private sealed class TreeNode
+    {
+        public string  Id           { get; init; } = "";
+        public string? ParentId     { get; init; }
+        public string  Text         { get; init; } = "";
+        public string? RelativePath { get; init; }        // non-null → file node
+        public string? Content      { get; init; }
+        public bool    HasChildren  { get; init; }
+        public ISvgIcon? Icon       { get; init; }
+        public bool IsFile => RelativePath is not null;
+    }
+
+    // ── State ───────────────────────────────────────────────────────────────
+
+    private bool                _busy;
+    private GenerationResult?   _preview;
+    private GenerationResult?   _result;
+    private List<TreeNode>      _flatNodes      = [];
+    private IEnumerable<object> _expandedItems  = new List<object>();
+    private IEnumerable<object> _selectedItems  = new List<object>();
+    private TreeNode?           _selectedNode;
+    private TelerikNotification _notification   = null!;
+
+    // ── Lifecycle ────────────────────────────────────────────────────────────
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // OnInitializedAsync runs during SSR prerender with an empty ScaffolderState.
+        // OnAfterRenderAsync(firstRender) fires only after the interactive SignalR
+        // circuit connects, so the real state (with selected tables) is available.
+        if (firstRender && _preview is null && State.SelectedTables.Count > 0)
+            await RunPreviewAsync();
+    }
+
+    // ── Request builder ──────────────────────────────────────────────────────
+
+    private GenerationRequest BuildRequest() => new()
+    {
+        RootNamespace       = State.RootNamespace,
+        OutputPath          = State.OutputPath,
+        Tables              = State.SelectedTables,
+        AllTables           = State.Database?.AllTables.ToList() ?? [],
+        ConnectionString    = State.ConnectionString,
+        TablePrefix         = State.TablePrefix,
+        SpPrefix            = State.SpPrefix,
+        StoredProcedures    = State.SelectedStoredProcedures,
+        GenerateApiTests    = State.GenerateApiTests,
+        GenerateBlazorTests = State.GenerateBlazorTests
+    };
+
+    // ── Preview / Generate ───────────────────────────────────────────────────
+
+    private async Task PreviewAsync()
+    {
+        _result = null;
+        await RunPreviewAsync();
+    }
+
+    private async Task RunPreviewAsync()
+    {
+        _busy = true;
+        await Task.Yield();
+        try
+        {
+            _preview = Engine.Preview(BuildRequest());
+            RebuildTree();
+        }
+        catch (Exception ex)
+        {
+            _notification.Show(new NotificationModel { Text = $"Preview error: {ex.Message}", ThemeColor = "error", CloseAfter = 0 });
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task GenerateAsync()
+    {
+        _busy = true;
+        await Task.Yield();
+        try
+        {
+            _result  = Engine.Generate(BuildRequest());
+            _preview = null;
+            _flatNodes = []; _selectedNode = null;
+            _expandedItems = new List<object>();
+            _selectedItems = new List<object>();
+            if (_result.Success)
+                _notification.Show(new NotificationModel { Text = $"Generated {_result.Files.Count} files!", ThemeColor = "success", CloseAfter = 3000 });
+            else
+                _notification.Show(new NotificationModel { Text = "Generation completed with errors — see details below.", ThemeColor = "error", CloseAfter = 0 });
+        }
+        catch (Exception ex)
+        {
+            _notification.Show(new NotificationModel { Text = $"Error: {ex.Message}", ThemeColor = "error", CloseAfter = 0 });
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // ── Tree building ────────────────────────────────────────────────────────
+
+    private void RebuildTree()
+    {
+        _selectedNode = null;
+        _selectedItems = new List<object>();
+
+        if (_preview?.Files is null or { Count: 0 })
+        {
+            _flatNodes = [];
+            _expandedItems = new List<object>();
+            return;
+        }
+
+        _flatNodes = BuildFlatNodes(_preview.Files);
+
+        // Auto-expand the first two levels
+        var topLevelIds = _flatNodes.Where(n => n.ParentId is null).Select(n => n.Id);
+        var secondLevelIds = _flatNodes.Where(n => n.ParentId is not null && !n.IsFile
+                                                    && topLevelIds.Contains(n.ParentId))
+                                        .Select(n => n.Id);
+        _expandedItems = _flatNodes.Where(n => topLevelIds.Contains(n.Id) || secondLevelIds.Contains(n.Id))
+                                    .Cast<object>()
+                                    .ToList();
+    }
+
+    private static List<TreeNode> BuildFlatNodes(List<GeneratedFile> files)
+    {
+        var nodes = new Dictionary<string, TreeNode>();
+        var order = new List<TreeNode>();
+
+        foreach (var file in files.OrderBy(f => f.RelativePath))
+        {
+            var parts = file.RelativePath.Split('/');
+            string? parentId = null;
+            var pathSoFar = "";
+            for (var i = 0; i < parts.Length; i++)
+            {
+                var part = parts[i];
+                pathSoFar = pathSoFar.Length == 0 ? part : $"{pathSoFar}/{part}";
+                var isLast = i == parts.Length - 1;
+
+                if (!nodes.TryGetValue(pathSoFar, out var node))
+                {
+                    node = new TreeNode
+                    {
+                        Id           = pathSoFar,
+                        ParentId     = parentId,
+                        Text         = part,
+                        RelativePath = isLast ? file.RelativePath : null,
+                        Content      = isLast ? file.Content      : null,
+                        HasChildren  = !isLast,
+                        Icon         = isLast ? GetFileIcon(part) : SvgIcon.Folder
+                    };
+                    nodes[pathSoFar] = node;
+                    order.Add(node);
+                }
+                parentId = pathSoFar;
+            }
+        }
+
+        return order;
+    }
+
+    private void OnTreeSelectionChanged(IEnumerable<object> selected)
+    {
+        _selectedItems = selected;
+        var node = selected.Cast<TreeNode>().FirstOrDefault();
+        _selectedNode = node is { IsFile: true } ? node : null;
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static ISvgIcon GetFileIcon(string name) =>
+        Path.GetExtension(name).ToLowerInvariant() switch
+        {
+            ".cs"             => SvgIcon.Code,
+            ".razor"          => SvgIcon.Code,
+            ".json"           => SvgIcon.FileConfig,
+            ".sln"            => SvgIcon.Sln,
+            ".csproj"         => SvgIcon.FileConfig,
+            ".md"             => SvgIcon.FileTxt,
+            ".yml" or ".yaml" => SvgIcon.FileConfig,
+            ".css"            => SvgIcon.Css,
+            _                 => SvgIcon.File
+        };
+}

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Telerik.UI.for.Blazor" Version="14.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PragmaticScaffolder.Application\PragmaticScaffolder.Application.csproj" />
+    <ProjectReference Include="..\PragmaticScaffolder.Infrastructure\PragmaticScaffolder.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

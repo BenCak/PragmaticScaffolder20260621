@@ -1,0 +1,46 @@
+# {{ namespace }}
+
+Generated app structure:
+
+- `src/{{ namespace }}.Blazor`: Telerik UI for Blazor UI and typed API clients.
+- `src/{{ namespace }}.Api`: Minimal API endpoints and feature services.
+- `src/{{ namespace }}.Data`: EF Core `AppDbContext` and database entities.
+- `src/{{ namespace }}.Shared`: DTOs and request contracts.
+- `tests/{{ namespace }}.Api.Tests`: API service tests.
+- `tests/{{ namespace }}.Blazor.Tests`: bUnit UI tests.
+
+## Telerik UI for Blazor prerequisites
+
+This app references the `Telerik.UI.for.Blazor` package, which requires:
+
+- A NuGet source that can resolve it (e.g. Telerik's private feed, or a local feed pointing at an extracted
+  Telerik UI for Blazor offline installer's `packages` folder).
+- A valid license file at `~/.telerik/telerik-license.txt` (or `%AppData%\Telerik\telerik-license.txt` on Windows).
+
+Without both, `dotnet restore`/`dotnet build` will fail or emit a trial-expired warning.
+
+## Run Locally
+
+Start the API:
+
+```bash
+dotnet run --project src/{{ namespace }}.Api/{{ namespace }}.Api.csproj
+```
+
+Start the Blazor UI:
+
+```bash
+dotnet run --project src/{{ namespace }}.Blazor/{{ namespace }}.Blazor.csproj
+```
+
+Run tests:
+
+```bash
+dotnet test
+```
+
+Run with Docker:
+
+```bash
+docker compose -f docker/docker-compose.yml up --build
+```

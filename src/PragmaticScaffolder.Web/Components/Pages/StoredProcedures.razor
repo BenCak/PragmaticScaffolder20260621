@@ -1,0 +1,205 @@
+@page "/procedures"
+@using PragmaticScaffolder.Domain.Models
+@using PragmaticScaffolder.Application.Services
+@inject ScaffolderState State
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<PageTitle>Stored Procedures — Pragmatic Scaffolder</PageTitle>
+
+<h3>Step 2b — Stored Procedures for UI</h3>
+<p class="subtitle">
+    Select which stored procedures should get a search page, API endpoint, and service.
+    Prefixes applied — SP: <strong>@State.SpPrefix</strong> / Table: <strong>@State.TablePrefix</strong>
+</p>
+<div class="tsc-alert tsc-alert-info">
+    All stored procedures remain accessible via the <strong>AppDbContext connection</strong>.
+    Only selected procedures get generated UI and endpoints.
+</div>
+
+@if (State.Database is null)
+{
+    <div class="tsc-alert tsc-alert-warning">
+        Not connected. <a href="/">Go back to Connect</a>.
+    </div>
+}
+else
+{
+    var groups = GetGroups();
+
+    @if (!groups.Any())
+    {
+        <div class="tsc-alert tsc-alert-info">No stored procedures found in this database.</div>
+    }
+    else
+    {
+        <div class="toolbar-row">
+            <TelerikButton FillMode="@ThemeConstants.Button.FillMode.Outline" Size="@ThemeConstants.Button.Size.Small"
+                           OnClick="@SelectAllDescribable">
+                Select All Describable
+            </TelerikButton>
+            <TelerikButton FillMode="@ThemeConstants.Button.FillMode.Outline" Size="@ThemeConstants.Button.Size.Small"
+                           OnClick="@ClearAll">
+                Clear All
+            </TelerikButton>
+            <span class="selected-count">@State.SelectedProcKeys.Count selected</span>
+        </div>
+
+        @foreach (var group in groups)
+        {
+            <h5 class="group-heading">@group.Key</h5>
+            <TelerikCard Width="100%">
+                <CardBody>
+                    @foreach (var sp in group)
+                    {
+                        var key = $"{sp.Schema}.{sp.Name}";
+                        var selected = State.SelectedProcKeys.Contains(key);
+                        <div class="proc-row">
+                            @if (sp.HasDescribableResult)
+                            {
+                                <TelerikCheckBox Id="@key" Value="@selected" ValueChanged="@((bool v) => Toggle(key, v))" />
+                            }
+                            else
+                            {
+                                <span title="@($"Cannot describe result: {sp.DescribeError}")">
+                                    <TelerikCheckBox Value="false" Enabled="false" />
+                                </span>
+                            }
+                            <div class="proc-details">
+                                <span class="@(sp.HasDescribableResult ? "" : "proc-disabled")">@sp.Name</span>
+                                @if (sp.HasDescribableResult)
+                                {
+                                    var (ff, cn, an) = ParseName(sp.Name);
+                                    <div class="proc-caption">
+                                        → @cn@an &nbsp;·&nbsp; @sp.ResultColumns.Count result col(s)
+                                    </div>
+                                    @if (sp.InputParameters.Any())
+                                    {
+                                        <div class="proc-params">
+                                            @foreach (var p in sp.InputParameters)
+                                            {
+                                                <TelerikChip Text="@($"{p.ParameterName} {p.DataType}{(p.MaxLength.HasValue && p.MaxLength > 0 ? $"({p.MaxLength})" : "")}")" />
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="proc-caption">No input parameters</div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="proc-caption proc-error">Result set cannot be described</div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </CardBody>
+            </TelerikCard>
+        }
+    }
+
+    <div class="toolbar-row toolbar-nav">
+        <TelerikButton OnClick="@(() => Nav.NavigateTo("/tables"))">← Back to Tables</TelerikButton>
+        <TelerikButton ThemeColor="@ThemeConstants.Button.ThemeColor.Primary" OnClick="@(() => Nav.NavigateTo("/generate"))">
+            Continue to Generate →
+        </TelerikButton>
+    </div>
+}
+
+<style>
+    .toolbar-row {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        margin-bottom: .75rem;
+    }
+
+    .toolbar-nav {
+        margin-top: 1.5rem;
+    }
+
+    .selected-count {
+        margin-left: .5rem;
+    }
+
+    .group-heading {
+        margin-top: 1rem;
+        margin-bottom: .25rem;
+    }
+
+    .proc-row {
+        display: flex;
+        align-items: flex-start;
+        gap: .75rem;
+        padding: .5rem 0;
+        border-bottom: 1px solid var(--kendo-color-border, #eee);
+    }
+
+    .proc-row:last-child {
+        border-bottom: none;
+    }
+
+    .proc-details {
+        display: flex;
+        flex-direction: column;
+        gap: .15rem;
+    }
+
+    .proc-disabled {
+        opacity: .5;
+    }
+
+    .proc-caption {
+        font-size: .82rem;
+        color: var(--kendo-color-subtle, #666);
+    }
+
+    .proc-error {
+        color: #b71c1c;
+    }
+
+    .proc-params {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .25rem;
+    }
+</style>
+
+@code {
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // SSR prerender uses a fresh DI scope where State.Database is null.
+        // After the SignalR circuit connects, force a re-render so the real state is shown.
+        if (firstRender) StateHasChanged();
+    }
+
+    private IEnumerable<IGrouping<string, StoredProcedureMetadata>> GetGroups()
+    {
+        return State.Database!.AllStoredProcedures
+            .OrderBy(sp => sp.Name)
+            .GroupBy(sp =>
+            {
+                var (ff, _, _) = ParseName(sp.Name);
+                return ff;
+            })
+            .OrderBy(g => g.Key);
+    }
+
+    private (string FeatureFolder, string ClassName, string ActionName) ParseName(string procName) =>
+        NamingHelper.ParseProcName(procName, State.SpPrefix, State.TablePrefix);
+
+    private void Toggle(string key, bool value)
+    {
+        if (value) State.SelectedProcKeys.Add(key);
+        else       State.SelectedProcKeys.Remove(key);
+    }
+
+    private void SelectAllDescribable()
+    {
+        foreach (var sp in State.Database!.AllStoredProcedures.Where(s => s.HasDescribableResult))
+            State.SelectedProcKeys.Add($"{sp.Schema}.{sp.Name}");
+    }
+
+    private void ClearAll() => State.SelectedProcKeys.Clear();
+}

@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PragmaticScaffolder.Domain/PragmaticScaffolder.Domain.csproj" />
+    <Project Path="src/PragmaticScaffolder.Application/PragmaticScaffolder.Application.csproj" />
+    <Project Path="src/PragmaticScaffolder.Infrastructure/PragmaticScaffolder.Infrastructure.csproj" />
+    <Project Path="src/PragmaticScaffolder.TestGen/PragmaticScaffolder.TestGen.csproj" />
+    <Project Path="src/PragmaticScaffolder.Web/PragmaticScaffolder.Web.csproj" />
+  </Folder>
+</Solution>

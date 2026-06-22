@@ -1,0 +1,140 @@
+@page "/tables"
+@inject ScaffolderState State
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<PageTitle>Select Tables — Pragmatic Scaffolder</PageTitle>
+
+<h3>Step 2 — Select Tables for UI</h3>
+<p class="subtitle">
+    Select which tables should get a Blazor page, API endpoints, service, and DTOs.
+</p>
+<div class="tsc-alert tsc-alert-info">
+    <strong>All tables</strong> are always included in the EF Core entities and DbContext — your full ORM is always generated.
+    Select only the tables you want to expose as UI and API.
+</div>
+
+@if (State.Database is null)
+{
+    <div class="tsc-alert tsc-alert-warning">
+        No database loaded. <a href="/">Go back to Connect</a>.
+    </div>
+}
+else
+{
+    <TelerikCard Width="100%">
+        <CardBody>
+            <div class="toolbar-row">
+                <TelerikTextBox @bind-Value="@_search" Placeholder="Filter tables…" Width="300px" />
+                <div class="toolbar-actions">
+                    <TelerikButton Size="@ThemeConstants.Button.Size.Small" OnClick="@SelectAll">Select All</TelerikButton>
+                    <TelerikButton Size="@ThemeConstants.Button.Size.Small" OnClick="@ClearAll">Clear</TelerikButton>
+                </div>
+            </div>
+
+            @{
+                var totalTables = State.Database.Schemas.Sum(s => s.Tables.Count);
+            }
+            @if (totalTables == 0)
+            {
+                <div class="tsc-alert tsc-alert-warning">
+                    No tables found in <strong>@State.Database.DatabaseName</strong>.
+                    Make sure your connection string includes <code>Database=yourdb</code> or <code>Initial Catalog=yourdb</code>
+                    and that the database has user tables.
+                    <a href="/">Go back to Connect</a>.
+                </div>
+            }
+
+            @foreach (var schema in State.Database.Schemas)
+            {
+                var visibleTables = schema.Tables
+                    .Where(t => string.IsNullOrEmpty(_search) ||
+                                t.Name.Contains(_search, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (!visibleTables.Any()) continue;
+
+                <h5 class="schema-heading">@schema.Name</h5>
+                @foreach (var table in visibleTables)
+                {
+                    var key = $"{table.Schema}.{table.Name}";
+                    <div class="table-row">
+                        <TelerikCheckBox Id="@key" Value="@State.SelectedTableKeys.Contains(key)"
+                                         ValueChanged="@((bool v) => Toggle(key, v))" />
+                        <label for="@key">@table.Name</label>
+                    </div>
+                }
+            }
+
+            <hr class="divider" />
+
+            <div class="toolbar-row">
+                <TelerikButton ThemeColor="@ThemeConstants.Button.ThemeColor.Primary"
+                               Enabled="@(State.SelectedTableKeys.Count > 0)"
+                               OnClick="@(() => Nav.NavigateTo("/procedures"))">
+                    Next — Stored Procedures →
+                </TelerikButton>
+                <TelerikButton OnClick="@(() => Nav.NavigateTo("/"))">Back</TelerikButton>
+            </div>
+        </CardBody>
+    </TelerikCard>
+}
+
+<style>
+    .toolbar-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: .75rem;
+        margin-bottom: .75rem;
+    }
+
+    .toolbar-actions {
+        display: flex;
+        gap: .5rem;
+    }
+
+    .schema-heading {
+        margin-top: 1rem;
+        margin-bottom: .25rem;
+        color: var(--kendo-color-subtle, #666);
+    }
+
+    .table-row {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .15rem 0;
+    }
+
+    .divider {
+        margin: 1.5rem 0;
+        border: none;
+        border-top: 1px solid var(--kendo-color-border, #ddd);
+    }
+</style>
+
+@code {
+    private string _search = string.Empty;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // SSR prerender uses a fresh DI scope where State.Database is null.
+        // After the SignalR circuit connects, force a re-render so the real state is shown.
+        if (firstRender) StateHasChanged();
+    }
+
+    private void Toggle(string key, bool selected)
+    {
+        if (selected) State.SelectedTableKeys.Add(key);
+        else State.SelectedTableKeys.Remove(key);
+    }
+
+    private void SelectAll()
+    {
+        foreach (var t in State.Database?.AllTables ?? [])
+            State.SelectedTableKeys.Add($"{t.Schema}.{t.Name}");
+    }
+
+    private void ClearAll() => State.SelectedTableKeys.Clear();
+}

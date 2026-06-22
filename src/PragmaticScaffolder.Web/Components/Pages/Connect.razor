@@ -1,0 +1,166 @@
+@page "/"
+@using System.ComponentModel.DataAnnotations
+@using PragmaticScaffolder.Application.Abstractions
+@inject ISchemaReader SchemaReader
+@inject ScaffolderState State
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<PageTitle>Connect — Pragmatic Scaffolder</PageTitle>
+
+<h3>Step 1 — Connect to Database</h3>
+<p class="subtitle">
+    Enter your SQL Server connection string. The scaffolder reads the schema and never modifies your database.
+</p>
+
+@* Quick-connect profiles *@
+<p class="caption">Quick profiles</p>
+<div class="profile-row">
+    @foreach (var profile in ConnectionProfiles.All)
+    {
+        <TelerikChip Text="@profile.Name" Icon="@profile.Icon" OnClick="@(() => LoadProfile(profile))" />
+    }
+</div>
+
+<TelerikCard Width="640px">
+    <CardBody>
+        <TelerikForm Model="@_model" OnValidSubmit="@ConnectAsync">
+            <FormValidation>
+                <DataAnnotationsValidator />
+            </FormValidation>
+            <FormItems>
+                <FormItem Field="@nameof(ConnectFormModel.ConnectionString)" LabelText="Connection String"
+                          EditorType="@FormEditorType.TextArea"
+                          Hint='e.g. Server=.;Database=Northwind;Trusted_Connection=true;TrustServerCertificate=true;' />
+                <FormItem Field="@nameof(ConnectFormModel.RootNamespace)" LabelText="Root Namespace"
+                          Hint='Used as the C# namespace and folder name (e.g. "NorthwindApp").' />
+                <FormItem Field="@nameof(ConnectFormModel.OutputPath)" LabelText="Output Folder"
+                          Hint="The generated solution will be written here." />
+                <FormItem Field="@nameof(ConnectFormModel.TablePrefix)" LabelText="Table Prefix to Strip"
+                          Hint='Optional. Strips this prefix from table names in generated code (e.g. "tbl" turns "tblCustomer" into "Customer").' />
+                <FormItem Field="@nameof(ConnectFormModel.SpPrefix)" LabelText="Stored Procedure Prefix to Strip"
+                          Hint='Optional. Strips this prefix from SP names (e.g. "usp_" turns "usp_tblOrders_Search" into "tblOrders_Search").' />
+            </FormItems>
+            <FormButtons>
+                <TelerikButton ButtonType="@ButtonType.Submit" ThemeColor="@ThemeConstants.Button.ThemeColor.Primary"
+                               Enabled="@(!_busy)">
+                    @(_busy ? "Connecting…" : "Connect & Load Schema")
+                </TelerikButton>
+                @if (_busy)
+                {
+                    <TelerikLoader Size="@ThemeConstants.Loader.Size.Small" />
+                }
+            </FormButtons>
+        </TelerikForm>
+    </CardBody>
+</TelerikCard>
+
+<TelerikNotification @ref="@_notification" />
+
+<style>
+    .subtitle, .caption {
+        color: var(--kendo-color-subtle, #666);
+    }
+
+    .profile-row {
+        display: flex;
+        gap: .5rem;
+        margin-bottom: 1rem;
+    }
+</style>
+
+@code {
+    private bool _busy;
+    private readonly ConnectFormModel _model = new();
+    private TelerikNotification _notification = null!;
+
+    protected override void OnInitialized()
+    {
+        // Pre-fill from state if already connected, otherwise use the default test profile
+        if (!string.IsNullOrEmpty(State.ConnectionString))
+        {
+            _model.ConnectionString = State.ConnectionString;
+            _model.RootNamespace    = State.RootNamespace;
+            _model.OutputPath       = State.OutputPath;
+            _model.TablePrefix      = State.TablePrefix;
+            _model.SpPrefix         = State.SpPrefix;
+        }
+        else
+        {
+            LoadProfile(ConnectionProfiles.All[0]);
+        }
+    }
+
+    private void LoadProfile(ConnectionProfile profile)
+    {
+        _model.ConnectionString = profile.ConnectionString;
+        _model.RootNamespace    = profile.DefaultNamespace;
+        _model.OutputPath       = profile.DefaultOutputPath;
+        _model.TablePrefix      = profile.TablePrefix;
+        _model.SpPrefix         = profile.SpPrefix;
+    }
+
+    private async Task ConnectAsync()
+    {
+        _busy = true;
+        State.ConnectionString = _model.ConnectionString;
+        State.RootNamespace    = _model.RootNamespace;
+        State.OutputPath       = _model.OutputPath;
+        State.TablePrefix      = _model.TablePrefix;
+        State.SpPrefix         = _model.SpPrefix;
+
+        try
+        {
+            var ok = await SchemaReader.TestConnectionAsync(_model.ConnectionString);
+            if (!ok)
+            {
+                _notification.Show(new NotificationModel
+                {
+                    Text = "Could not connect. Check the connection string and try again.",
+                    ThemeColor = "error",
+                    CloseAfter = 4000
+                });
+                return;
+            }
+
+            _notification.Show(new NotificationModel
+            {
+                Text = "Connected! Loading schema…",
+                ThemeColor = "info",
+                CloseAfter = 2000
+            });
+            State.Database = await SchemaReader.ReadDatabaseAsync(_model.ConnectionString);
+            State.SelectedTableKeys.Clear();
+            State.SelectedProcKeys.Clear();
+            Nav.NavigateTo("/tables");
+        }
+        catch (Exception ex)
+        {
+            _notification.Show(new NotificationModel
+            {
+                Text = $"Error: {ex.Message}",
+                ThemeColor = "error",
+                CloseAfter = 0
+            });
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private sealed class ConnectFormModel
+    {
+        [Required(ErrorMessage = "Connection string is required.")]
+        public string ConnectionString { get; set; } = "";
+
+        [Required(ErrorMessage = "Namespace is required.")]
+        public string RootNamespace { get; set; } = "MyApp";
+
+        [Required(ErrorMessage = "Output folder is required.")]
+        public string OutputPath { get; set; } = "";
+
+        public string TablePrefix { get; set; } = "";
+        public string SpPrefix { get; set; } = "usp_";
+    }
+}
