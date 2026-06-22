@@ -33,4 +33,7 @@ public sealed class GenerationRequest
 
     /// <summary>Whether to generate the Blazor.Tests project and test stubs.</summary>
     public bool GenerateBlazorTests { get; set; } = true;
+
+    /// <summary>When true, generates SCM3-compliant code with Result&lt;T&gt;, audit logging, repositories, and permission checks.</summary>
+    public bool IsSCM3Target { get; set; } = false;
 }

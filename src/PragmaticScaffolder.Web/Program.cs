@@ -30,6 +30,13 @@ builder.Services.AddScoped<ICodeGenerator, TestsGenerator>();
 builder.Services.AddScoped<ICodeGenerator, ProjectFilesGenerator>();
 builder.Services.AddScoped<ICodeGenerator, StoredProcedureGenerator>();
 
+// SCM3-compliant generators (run when IsSCM3Target = true)
+builder.Services.AddScoped<ICodeGenerator, SCM3DtoGenerator>();
+builder.Services.AddScoped<ICodeGenerator, SCM3RepositoryGenerator>();
+builder.Services.AddScoped<ICodeGenerator, SCM3ServiceGenerator>();
+builder.Services.AddScoped<ICodeGenerator, SCM3EndpointsGenerator>();
+builder.Services.AddScoped<ICodeGenerator, SCM3BlazorPageGenerator>();
+
 builder.Services.AddScoped<GenerationEngine>();
 
 // Session-scoped state shared across wizard pages
