@@ -23,6 +23,30 @@ public sealed class {{ feature_folder }}ServiceTests
         Assert.That(await db.SaveChangesAsync(), Is.EqualTo(0));
     }
 
+{{- if has_not_empty_test }}
+    [Test]
+    public void CreateRequestValidator_WithEmpty{{ not_empty_property_name }}_FailsValidation()
+    {
+        var validator = new Create{{ class_name }}RequestValidator();
+        var request = CreateRequest() with { {{ not_empty_property_name }} = string.Empty };
+
+        var result = validator.Validate(request);
+
+        Assert.That(result.IsValid, Is.False);
+    }
+{{- else if has_max_length_test }}
+    [Test]
+    public void CreateRequestValidator_WithTooLong{{ max_length_property_name }}_FailsValidation()
+    {
+        var validator = new Create{{ class_name }}RequestValidator();
+        var request = CreateRequest() with { {{ max_length_property_name }} = new string('x', {{ max_length_value }} + 1) };
+
+        var result = validator.Validate(request);
+
+        Assert.That(result.IsValid, Is.False);
+    }
+{{- end }}
+
 {{- if has_single_pk }}
     [Test]
     public async Task GetByIdAsync_WithExistingId_ReturnsDto()

@@ -8,4 +8,7 @@
     <ProjectReference Include="..\{{ namespace }}.Data\{{ namespace }}.Data.csproj" />
     <ProjectReference Include="..\{{ namespace }}.Shared\{{ namespace }}.Shared.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="12.*" />
+  </ItemGroup>
 </Project>

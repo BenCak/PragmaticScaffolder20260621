@@ -5,9 +5,18 @@ Generated app structure:
 - `src/{{ namespace }}.Blazor`: Telerik UI for Blazor UI and typed API clients.
 - `src/{{ namespace }}.Api`: Minimal API endpoints and feature services.
 - `src/{{ namespace }}.Data`: EF Core `AppDbContext` and database entities.
-- `src/{{ namespace }}.Shared`: DTOs and request contracts.
+- `src/{{ namespace }}.Shared`: DTOs, request contracts, and their FluentValidation validators.
 - `tests/{{ namespace }}.Api.Tests`: API service tests.
 - `tests/{{ namespace }}.Blazor.Tests`: bUnit UI tests.
+
+## Validation
+
+Each `Create{Entity}Request`/`Update{Entity}Request` has a matching `FluentValidation` validator in
+`src/{{ namespace }}.Shared` (e.g. `CreateCustomerRequestValidator`), generated from the column's nullability
+and max length. The Minimal API endpoints run the validator before calling into the service — a failing
+request returns `400` with a `ValidationProblem` body listing the failing fields, instead of reaching the
+database. The generated Blazor API client reads that body and surfaces the field errors in its error
+notification.
 
 ## Telerik UI for Blazor prerequisites
 

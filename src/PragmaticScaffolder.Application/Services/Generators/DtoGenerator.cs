@@ -64,6 +64,18 @@ public sealed class DtoGenerator(ITemplateRenderer renderer) : ICodeGenerator
                 RelativePath = $"src/{request.RootNamespace}.Shared/{featureFolder}/Update{className}Request.cs",
                 Content      = renderer.Render("UpdateRequest", model)
             };
+
+            yield return new GeneratedFile
+            {
+                RelativePath = $"src/{request.RootNamespace}.Shared/{featureFolder}/Create{className}RequestValidator.cs",
+                Content      = renderer.Render("CreateRequestValidator", model)
+            };
+
+            yield return new GeneratedFile
+            {
+                RelativePath = $"src/{request.RootNamespace}.Shared/{featureFolder}/Update{className}RequestValidator.cs",
+                Content      = renderer.Render("UpdateRequestValidator", model)
+            };
         }
     }
 

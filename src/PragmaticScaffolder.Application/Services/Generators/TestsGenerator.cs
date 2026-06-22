@@ -29,21 +29,28 @@ public sealed class TestsGenerator(ITemplateRenderer renderer) : ICodeGenerator
                     PropertyName = NamingHelper.ToPropertyName(c.Name),
                     c.ClrType,
                     c.IsNullable,
+                    c.MaxLength,
                     SampleValue  = GetSampleValue(c)
                 }).ToList();
 
+            // A validation test is only worth generating if the validator actually has a rule to violate.
+            var notEmptyColumn  = createColumns.FirstOrDefault(c => c.ClrType == "string" && !c.IsNullable);
+            var maxLengthColumn = notEmptyColumn is null
+                ? createColumns.FirstOrDefault(c => c.ClrType is "string" or "string?" && c.MaxLength is > 0)
+                : null;
+
             var model = new
             {
-                Namespace       = ns,
-                DataNamespace   = $"{ns}.Data",
-                SharedNamespace = $"{ns}.Shared",
-                ApiNamespace    = $"{ns}.Api.Features.{featureFolder}",
-                BlazorNamespace = $"{ns}.Blazor.Features.{featureFolder}",
-                ClassName       = className,
-                FeatureFolder   = featureFolder,
-                RoutePrefix     = featureFolder.ToLowerInvariant(),
-                HasSinglePk     = pkColumns.Count == 1,
-                PkColumns       = pkColumns.Select(c => new
+                Namespace             = ns,
+                DataNamespace         = $"{ns}.Data",
+                SharedNamespace       = $"{ns}.Shared",
+                ApiNamespace          = $"{ns}.Api.Features.{featureFolder}",
+                BlazorNamespace       = $"{ns}.Blazor.Features.{featureFolder}",
+                ClassName             = className,
+                FeatureFolder         = featureFolder,
+                RoutePrefix           = featureFolder.ToLowerInvariant(),
+                HasSinglePk           = pkColumns.Count == 1,
+                PkColumns             = pkColumns.Select(c => new
                 {
                     c.Name,
                     PropertyName = NamingHelper.ToPropertyName(c.Name),
@@ -51,7 +58,12 @@ public sealed class TestsGenerator(ITemplateRenderer renderer) : ICodeGenerator
                     ParamName    = NamingHelper.ToParamName(NamingHelper.ToPropertyName(c.Name)),
                     SampleValue  = GetSampleValue(c)
                 }).ToList(),
-                CreateColumns   = createColumns
+                CreateColumns         = createColumns,
+                HasNotEmptyTest       = notEmptyColumn is not null,
+                NotEmptyPropertyName  = notEmptyColumn?.PropertyName,
+                HasMaxLengthTest      = maxLengthColumn is not null,
+                MaxLengthPropertyName = maxLengthColumn?.PropertyName,
+                MaxLengthValue        = maxLengthColumn?.MaxLength
             };
 
             if (request.GenerateApiTests)
